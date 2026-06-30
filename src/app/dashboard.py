@@ -1,4 +1,4 @@
-import os
+# ruff: noqa: E402
 import sys
 import time
 import logging
@@ -18,11 +18,16 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler(log_dir / "localslate.log", encoding="utf-8"),
-    ]
+    ],
 )
 
 from src.engine.db import init_db, get_latest_incidents, DatabaseEngine
-from src.app.queue_manager import start_queue_manager, stop_queue_manager, queue_status, get_queue_length
+from src.app.queue_manager import (
+    start_queue_manager,
+    stop_queue_manager,
+    queue_status,
+    get_queue_length,
+)
 from src.engine.audio_processor import WhisperProcessor
 from src.engine.slm_processor import SLMProcessor
 
@@ -33,9 +38,11 @@ try:
     from rich.table import Table
     from rich.text import Text
     from rich.live import Live
+
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
+
 
 # Retain Developer 1's class-based structure from main branch
 class DashboardUI:
@@ -76,6 +83,7 @@ class DashboardUI:
                 lock_path.unlink()
             self.status = "Idle"
 
+
 # Our Interactive Console dashboard routines
 def generate_mock_text_file():
     cache_dir = PROJECT_ROOT / "data" / "cache"
@@ -90,9 +98,11 @@ def generate_mock_text_file():
     filepath.write_text(content, encoding="utf-8")
     return filename
 
+
 def generate_mock_audio_file():
     import wave
     import struct
+
     cache_dir = PROJECT_ROOT / "data" / "cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     filename = f"report_audio_beta_{int(time.time())}.wav"
@@ -106,13 +116,15 @@ def generate_mock_audio_file():
             wav.writeframesraw(struct.pack("<h", 0))
     return filename
 
+
 def get_keypress():
     if sys.platform == "win32":
         import msvcrt
+
         if msvcrt.kbhit():
             ch = msvcrt.getch()
             try:
-                if ch in (b'\x00', b'\xe0'):
+                if ch in (b"\x00", b"\xe0"):
                     msvcrt.getch()
                     return None
                 return ch.decode("utf-8").lower()
@@ -120,20 +132,28 @@ def get_keypress():
                 return None
     return None
 
+
 def check_ram_string():
     try:
         import psutil
+
         mem = psutil.virtual_memory()
-        used_gb = mem.used / (1024 ** 3)
-        total_gb = mem.total / (1024 ** 3)
+        used_gb = mem.used / (1024**3)
+        total_gb = mem.total / (1024**3)
         return f"{used_gb:.2f}/{total_gb:.2f} GB ({mem.percent}%)"
     except ImportError:
         return "Unknown"
 
+
 def draw_header() -> Panel:
-    text = Text("LocalSlate - Offline-First Intelligence Dashboard 🌌", style="bold magenta")
-    text.append("\nCPU-Bound Inference Engine Pipeline | Offline Mode", style="cyan dim")
+    text = Text(
+        "LocalSlate - Offline-First Intelligence Dashboard 🌌", style="bold magenta"
+    )
+    text.append(
+        "\nCPU-Bound Inference Engine Pipeline | Offline Mode", style="cyan dim"
+    )
     return Panel(text, border_style="blue")
+
 
 def draw_status() -> Panel:
     status_text = Text()
@@ -141,30 +161,38 @@ def draw_status() -> Panel:
 
     manager_state = "RUNNING" if queue_status["is_running"] else "STOPPED"
     manager_color = "green" if queue_status["is_running"] else "red"
-    status_text.append(f"• Ingestion Service: ", style="bold")
+    status_text.append("• Ingestion Service: ", style="bold")
     status_text.append(f"{manager_state}\n", style=manager_color)
 
-    status_text.append(f"• Active File: ", style="bold")
+    status_text.append("• Active File: ", style="bold")
     curr_file = queue_status["current_file"]
     status_text.append(f"{curr_file or 'None'}\n", style="cyan")
 
-    status_text.append(f"• Pipeline Step: ", style="bold")
-    status_text.append(f"{queue_status['current_status']}\n", style="bold green" if queue_status["current_status"] != "Idle" else "white")
+    status_text.append("• Pipeline Step: ", style="bold")
+    status_text.append(
+        f"{queue_status['current_status']}\n",
+        style="bold green" if queue_status["current_status"] != "Idle" else "white",
+    )
 
-    status_text.append(f"• Local Ingest Queue: ", style="bold")
+    status_text.append("• Local Ingest Queue: ", style="bold")
     status_text.append(f"{get_queue_length()} pending\n", style="yellow")
 
-    status_text.append(f"• RAM Allocation: ", style="bold")
+    status_text.append("• RAM Allocation: ", style="bold")
     status_text.append(f"{check_ram_string()}\n", style="white")
 
-    status_text.append(f"• CPU Threads: ", style="bold")
+    status_text.append("• CPU Threads: ", style="bold")
     status_text.append("4 Max (2 Whisper, 2 SLM)\n\n", style="white")
 
     status_text.append("METRICS\n", style="bold yellow")
-    status_text.append(f"✓ Processed: {queue_status['processed_count']}\n", style="bold green")
-    status_text.append(f"✗ Failed/Pending: {queue_status['failed_count']}\n", style="bold red")
+    status_text.append(
+        f"✓ Processed: {queue_status['processed_count']}\n", style="bold green"
+    )
+    status_text.append(
+        f"✗ Failed/Pending: {queue_status['failed_count']}\n", style="bold red"
+    )
 
     return Panel(status_text, border_style="yellow")
+
 
 def draw_incidents() -> Panel:
     table = Table(expand=True)
@@ -199,9 +227,10 @@ def draw_incidents() -> Panel:
             Text(priority, style=color),
             locations if locations else "N/A",
             personnel if personnel else "N/A",
-            inc["system_summary"]
+            inc["system_summary"],
         )
     return Panel(table, border_style="green", title="Latest SQLite Database Records")
+
 
 def draw_footer() -> Panel:
     text = Text()
@@ -212,6 +241,7 @@ def draw_footer() -> Panel:
     text.append("[A]", style="bold blue")
     text.append(" Drop Mock WAV Audio File", style="white")
     return Panel(text, border_style="cyan")
+
 
 def main():
     if not HAS_RICH:
@@ -227,11 +257,10 @@ def main():
     layout.split(
         Layout(name="header", size=3),
         Layout(name="body", ratio=1),
-        Layout(name="footer", size=3)
+        Layout(name="footer", size=3),
     )
     layout["body"].split_row(
-        Layout(name="status", ratio=1),
-        Layout(name="incidents", ratio=3)
+        Layout(name="status", ratio=1), Layout(name="incidents", ratio=3)
     )
 
     console.print("[green]Launching LocalSlate CLI Dashboard...[/green]")
@@ -268,6 +297,7 @@ def main():
         stop_queue_manager()
         console.clear()
         print("LocalSlate ingestion background pipeline stopped. Goodbye.")
+
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,3 @@
-import os
 import shutil
 import uuid
 import time
@@ -6,7 +5,7 @@ import logging
 import threading
 import hashlib
 from pathlib import Path
-from src.engine.audio_processor import transcribe_audio, validate_audio_file
+from src.engine.audio_processor import transcribe_audio
 from src.engine.slm_processor import IncidentReport, structure_text
 from src.engine.db import insert_incident
 from watchdog.observers import Observer
@@ -28,15 +27,21 @@ queue_status = {
     "current_status": "Idle",
     "queue_count": 0,
     "processed_count": 0,
-    "failed_count": 0
+    "failed_count": 0,
 }
+
 
 def get_queue_length():
     try:
-        files = [f for f in QUEUE_DIR.iterdir() if f.is_file() and not f.name.endswith(".lock")]
+        files = [
+            f
+            for f in QUEUE_DIR.iterdir()
+            if f.is_file() and not f.name.endswith(".lock")
+        ]
         return len(files)
     except Exception:
         return 0
+
 
 def run_with_timeout(func, args, timeout):
     res = [None]
@@ -58,10 +63,11 @@ def run_with_timeout(func, args, timeout):
         return None, err[0]
     return res[0], None
 
+
 def process_file(file_path: Path):
     try:
         hasher = hashlib.md5()
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             buf = f.read(65536)
             while len(buf) > 0:
                 hasher.update(buf)
@@ -112,7 +118,7 @@ def process_file(file_path: Path):
                 text = f.read(4010)
 
             if len(text) > 4000:
-                logging.warning(f"Text file exceeds 4000 char limit. Truncating.")
+                logging.warning("Text file exceeds 4000 char limit. Truncating.")
                 text = text[:4000]
 
             queue_status["current_status"] = "Structuring..."
@@ -137,7 +143,9 @@ def process_file(file_path: Path):
             try:
                 shutil.move(str(dest_path), str(failed_dest))
             except Exception as move_err:
-                logging.error(f"Could not move failed file to failed folder: {move_err}")
+                logging.error(
+                    f"Could not move failed file to failed folder: {move_err}"
+                )
 
         try:
             fallback_report = IncidentReport(
@@ -145,11 +153,8 @@ def process_file(file_path: Path):
                 iso_timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 computed_priority_level="HIGH",
                 system_summary=f"FAILED PROCESSING: {str(e)[:200]}",
-                identified_entities={
-                    "locations": [],
-                    "personnel": []
-                },
-                actionable_tasks=[]
+                identified_entities={"locations": [], "personnel": []},
+                actionable_tasks=[],
             ).model_dump()
             insert_incident(fallback_report)
         except Exception as db_err:
@@ -160,6 +165,7 @@ def process_file(file_path: Path):
             lock_path.unlink()
         queue_status["current_file"] = None
         queue_status["current_status"] = "Idle"
+
 
 class AudioFileHandler(FileSystemEventHandler):
     def __init__(self, callback):
@@ -173,6 +179,7 @@ class AudioFileHandler(FileSystemEventHandler):
             time.sleep(1.0)
             if file_path.exists():
                 self.callback(file_path)
+
 
 class QueueManager:
     def __init__(self, process_callback):
@@ -192,14 +199,17 @@ class QueueManager:
         queue_status["is_running"] = False
         logging.info("Queue Manager Observer stopped.")
 
+
 # Compatibility global functions for our app shell
 global_queue_manager = None
+
 
 def start_queue_manager():
     global global_queue_manager
     if global_queue_manager is None:
         global_queue_manager = QueueManager(process_file)
         global_queue_manager.start()
+
 
 def stop_queue_manager():
     global global_queue_manager
